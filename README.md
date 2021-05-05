@@ -1,3 +1,3 @@
 # UIKitListWrapper
 
-A description of this package.
+Wrapper over UIKit UITableView

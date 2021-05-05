@@ -52,28 +52,6 @@ extension UIList where Header == Never, Fotter == Never {
     }
 }
 
-public class TableController: UIViewController {
-    
-    let tableView: UITableView = {
-        let view = UITableView()
-        view.translatesAutoresizingMaskIntoConstraints = false
-        view.backgroundColor = .clear
-        return view
-    }()
-    
-    public override func viewDidLoad() {
-        super.viewDidLoad()
-        view.addSubview(tableView)
-        
-        NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.topAnchor),
-            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor)
-        ])
-    }
-}
-
 public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRepresentable where
     Section:ItemsSection,
     Item: Hashable,
@@ -175,9 +153,8 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         }
         
         private var dataSource: UITableViewDiffableDataSource<Section, Item>?
-        
+        private var dataUpdateQueue: DispatchQueue = DispatchQueue(label: "com.list.data.update.queue")
         var parent: UIList
-        
         var fresh: Bool = true
         
         var data: [Section] = [] {
@@ -186,16 +163,15 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             }
         }
         
-        private var dataUpdateQueue: DispatchQueue = DispatchQueue(label: "com.list.data.update.queue")
-        
-        deinit {
-            data.removeAll()
-        }
         
         init(_ parent: UIList) {
             self.parent = parent
             super.init()
             createDataSource()
+        }
+        
+        deinit {
+            data.removeAll()
         }
         
         private func createDataSource() {
@@ -261,7 +237,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             indexPaths.forEach { indexPath in
                 if indexPath.section == data.count - 1 {
                     if indexPath.row == data[indexPath.section].items.count - 1 {
-                        print("=== DISPLAY LAST ITEM IN TABLE REQUEST MORE !!! ===")
+//                        print("=== DISPLAY LAST ITEM IN TABLE REQUEST MORE !!! ===")
                     }
                 }
             }
@@ -331,6 +307,8 @@ extension ListSection: Hashable {
     }
 }
 
+#if DEBUG
+
 struct UIList_Previews: PreviewProvider {
     
     private static let data:[ListSection<String>] = {
@@ -347,3 +325,5 @@ struct UIList_Previews: PreviewProvider {
         Text("")
     }
 }
+
+#endif
