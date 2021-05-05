@@ -85,6 +85,10 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     var onCellAppear: ((Content) -> Void)?
     var onCellDissappear: ((Content) -> Void)?
     
+    private var onRefresh: (() -> Void)?    
+    private var trailingActions: ((Item) -> UISwipeActionsConfiguration?)?
+    private var leadingActions: ((Item) -> UISwipeActionsConfiguration?)?
+
     private var vc: TableController = {
         let controller = TableController()
         controller.tableView.register(HostTableViewCell<Content>.self, forCellReuseIdentifier: "Cell")
@@ -103,6 +107,11 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     public func updateUIViewController(_ pageViewController: TableController, context: Context) {
         context.coordinator.fresh = fresh
         context.coordinator.data = data.map { $0 }
+        if let ref = onRefresh {
+            context.coordinator.tableController.addPullToRefresh {
+                ref()
+            }
+        }
     }
     
     public func makeCoordinator() -> Coordinator {
@@ -135,15 +144,33 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     public func fotter(_ block: FotterBlock?) -> Self {
         var new = self
         new.fotter = block
-        return self
+        return new
     }
 
     public func header(_ block: HeaderBlock?) -> Self {
         var new = self
         new.header = block
-        return self
+        return new
     }
     
+    public func setPullToRefresh(_ block: @escaping () -> Void) -> Self {
+        var new = self
+        new.onRefresh = block
+        return new
+    }
+    
+    public func setLeadingActions(_ block: ((Item) -> UISwipeActionsConfiguration?)?) -> Self {
+        var new = self
+        new.leadingActions = block
+        return new
+    }
+    
+    public func setTrailingActions(_ block: ((Item) -> UISwipeActionsConfiguration?)?) -> Self {
+        var new = self
+        new.trailingActions = block
+        return new
+    }
+        
     public class Coordinator: NSObject, UITableViewDelegate, UITableViewDataSourcePrefetching {
         
         typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Item>
@@ -176,7 +203,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         private func createDataSource() {
             let table = tableController.tableView
-            self.dataSource = UITableViewDiffableDataSource<Section, Item>(tableView: table) { [weak self] (tableView, indexPath, item) -> UITableViewCell? in
+            self.dataSource = InternalDataSource<Section, Item>(tableView: table) { [weak self] (tableView, indexPath, item) -> UITableViewCell? in
                 guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<Content> else { return nil }
                 guard let self = self else { return nil }
                 cell.setView(self.parent.configBlock(item), parentController: self.tableController)
@@ -202,6 +229,9 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                 if let ids = current?.itemIdentifiers  {
                     let new = snapshot.itemIdentifiers
                     if !new.isEmpty && new == self.lastUpdatedIds {
+                        DispatchQueue.main.async {
+                            self.tableController.tableView.refreshControl?.endRefreshing()
+                        }
                         return
                     }
                     if ids == new {
@@ -209,18 +239,35 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                             self.tableController.tableView.beginUpdates()
                             self.tableController.tableView.endUpdates()
                             self.lastUpdatedIds = new
+                            self.tableController.tableView.refreshControl?.endRefreshing()
                         }
                         return
                     }
                 }
                 self.dataSource?.apply(snapshot, animatingDifferences: self.parent.animateChanges) { [weak self] in
                     guard let self = self else { return }
+                    self.tableController.tableView.refreshControl?.endRefreshing()
                     guard self.tableController.tableView.numberOfSections > 0 else { return }
                     if self.fresh {
                         self.tableController.tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
                     }
                 }
             }
+        }
+        
+        public func tableView(_ tableView: UITableView,
+                       canEditRowAt indexPath: IndexPath) -> Bool {
+            return true
+        }
+        
+        public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
+            return parent.trailingActions?(item)
+        }
+        
+        public func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
+            return parent.leadingActions?(item)
         }
         
         public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
@@ -281,6 +328,13 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             view.setView(block(item, section), parentController: self.tableController)
             return view
         }
+    }
+}
+
+private class InternalDataSource<SectionIdentifierType: Hashable, ItemIdentifierType: Hashable>: UITableViewDiffableDataSource<SectionIdentifierType, ItemIdentifierType> {
+    
+    override func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        return true
     }
 }
 
