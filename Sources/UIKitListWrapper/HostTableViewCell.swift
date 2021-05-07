@@ -13,7 +13,7 @@ class HostTableViewCell<T: View>: UITableViewCell {
     private lazy var host: UIHostingController<HostCellView<T>> = {
         let hostController = UIHostingController(rootView: HostCellView<T>())
         hostController.view.translatesAutoresizingMaskIntoConstraints = false
-        hostController.view.backgroundColor = .clear
+        hostController.view.backgroundColor = .clear        
         return hostController
     }()
     

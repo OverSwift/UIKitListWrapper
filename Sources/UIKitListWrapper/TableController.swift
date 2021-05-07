@@ -31,6 +31,7 @@ public class TableController: UIViewController {
         if tableView.refreshControl != nil {
             return
         }
+        
         if #available(iOS 14.0, *) {
             let refresh = UIRefreshControl(frame: .zero, primaryAction: UIAction(handler: { [weak self] (action) in
                 self?.onRefresh()
@@ -41,6 +42,7 @@ public class TableController: UIViewController {
             let refresh = UIRefreshControl()
             refresh.addTarget(self, action: #selector(onRefresh), for: .valueChanged)
         }
+        
         onPullToRefresh = action
     }
     

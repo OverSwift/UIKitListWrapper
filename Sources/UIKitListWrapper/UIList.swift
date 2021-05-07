@@ -52,6 +52,13 @@ extension UIList where Header == Never, Fotter == Never {
     }
 }
 
+struct UICell<T>: View where T: View {
+    
+    var body: some View {
+        Text("")
+    }
+}
+
 public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRepresentable where
     Section:ItemsSection,
     Item: Hashable,
@@ -255,20 +262,6 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             }
         }
         
-        public func tableView(_ tableView: UITableView,
-                       canEditRowAt indexPath: IndexPath) -> Bool {
-            return true
-        }
-        
-        public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
-            return parent.trailingActions?(item)
-        }
-        
-        public func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
-            return parent.leadingActions?(item)
-        }
         
         public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
 //            guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<Content> else { return }
@@ -327,6 +320,34 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             
             view.setView(block(item, section), parentController: self.tableController)
             return view
+        }
+        
+        // Swipe actions support
+        public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
+            return parent.trailingActions?(item)
+        }
+        
+        public func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
+            return parent.leadingActions?(item)
+        }
+        
+        //Context Menu support
+
+        public func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
+            
+            return nil
+//                UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { (element) -> UIMenu? in
+//                return UIMenu(title: "", children: [
+//                    UIAction(title: "Delete", attributes: .destructive, handler: { (action) in
+//                        
+//                    }),
+//                    UIAction(title: "Edit", handler: { (action) in
+//                        
+//                    })
+//                ])
+//            }
         }
     }
 }
