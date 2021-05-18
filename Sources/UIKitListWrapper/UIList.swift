@@ -236,18 +236,14 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                 if let ids = current?.itemIdentifiers  {
                     let new = snapshot.itemIdentifiers
                     if !new.isEmpty && new == self.lastUpdatedIds {
-                        DispatchQueue.main.async {
-                            self.tableController.tableView.refreshControl?.endRefreshing()
-                        }
+                        self.refreshTableSizes()
                         return
                     }
                     if ids == new {
                         DispatchQueue.main.async {
-                            self.tableController.tableView.beginUpdates()
-                            self.tableController.tableView.endUpdates()
                             self.lastUpdatedIds = new
-                            self.tableController.tableView.refreshControl?.endRefreshing()
                         }
+                        self.refreshTableSizes()
                         return
                     }
                 }
@@ -262,6 +258,11 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             }
         }
         
+        private func refreshTableSizes() {
+            self.tableController.tableView.beginUpdates()
+            self.tableController.tableView.endUpdates()
+            self.tableController.tableView.refreshControl?.endRefreshing()
+        }
         
         public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
 //            guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<Content> else { return }
