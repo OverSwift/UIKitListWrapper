@@ -259,9 +259,11 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         }
         
         private func refreshTableSizes() {
-            self.tableController.tableView.beginUpdates()
-            self.tableController.tableView.endUpdates()
-            self.tableController.tableView.refreshControl?.endRefreshing()
+            DispatchQueue.main.async {
+                self.tableController.tableView.beginUpdates()
+                self.tableController.tableView.endUpdates()
+                self.tableController.tableView.refreshControl?.endRefreshing()
+            }
         }
         
         public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
