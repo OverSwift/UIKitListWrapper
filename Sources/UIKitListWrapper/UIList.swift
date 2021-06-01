@@ -52,10 +52,72 @@ extension UIList where Header == Never, Fotter == Never {
     }
 }
 
-struct UICell<T>: View where T: View {
+public struct AAAcition: Equatable {
+    
+    public var title: String
+    
+    static let empty = AAAcition(title: "none")
+    
+    public init(title: String) {
+        self.title = title
+    }
+}
+
+
+//UIContextMenuConfiguration
+
+struct ContextPrefferenceKey: PreferenceKey {
+    
+    static var defaultValue: UIContextMenuConfiguration? = nil
+    
+    static func reduce(value: inout UIContextMenuConfiguration?, nextValue: () -> UIContextMenuConfiguration?) {
+        value = nextValue()
+    }
+}
+
+extension View {
+    public func setUIListContextMenu(_ menu: UIContextMenuConfiguration) -> some View {
+        self.preference(key: ContextPrefferenceKey.self, value: menu)
+    }
+}
+
+
+public struct ActionsPrefferenceKey: PreferenceKey {
+    
+    public static var defaultValue: UISwipeActionsConfiguration? = nil
+    
+    public static func reduce(value: inout UISwipeActionsConfiguration?, nextValue: () -> UISwipeActionsConfiguration?) {
+        value = nextValue()
+    }
+}
+
+extension View {
+    
+    public func setUIListTrailAction(_ action: UISwipeActionsConfiguration?) -> some View {
+        self.preference(key: ActionsPrefferenceKey.self, value: action)
+    }
+}
+
+struct CellContentWrapper<Content: View>: View {
+    
+    var content: () -> Content
+    
+    var onTrailingActions: (UISwipeActionsConfiguration) -> Void
+    var onLeadingActions: (UISwipeActionsConfiguration) -> Void
+    var contextMenu: (UIContextMenuConfiguration) -> Void
     
     var body: some View {
-        Text("")
+        content()
+            .onPreferenceChange(ActionsPrefferenceKey.self, perform: { value in
+                if let actions = value {
+                    onTrailingActions(actions)
+                }
+            })
+            .onPreferenceChange(ContextPrefferenceKey.self, perform: { value in
+                if let menu = value {
+                    self.contextMenu(menu)
+                }
+            })
     }
 }
 
@@ -98,7 +160,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
 
     private var vc: TableController = {
         let controller = TableController()
-        controller.tableView.register(HostTableViewCell<Content>.self, forCellReuseIdentifier: "Cell")
+        controller.tableView.register(HostTableViewCell<CellContentWrapper<Content>>.self, forCellReuseIdentifier: "Cell")
         controller.tableView.register(HostTableViewHeaderFotterView<Header>.self, forHeaderFooterViewReuseIdentifier: "Header")
         controller.tableView.register(HostTableViewHeaderFotterView<Fotter>.self, forHeaderFooterViewReuseIdentifier: "Fotter")
         controller.tableView.separatorColor = .clear
@@ -208,12 +270,29 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             data.removeAll()
         }
         
+        private var trailingActions: [IndexPath : UISwipeActionsConfiguration] = [:]
+        private var leadingActions: [IndexPath : UISwipeActionsConfiguration] = [:]
+        private var menuActions: [IndexPath : UIContextMenuConfiguration] = [:]
+
         private func createDataSource() {
             let table = tableController.tableView
             self.dataSource = InternalDataSource<Section, Item>(tableView: table) { [weak self] (tableView, indexPath, item) -> UITableViewCell? in
-                guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<Content> else { return nil }
+                guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<CellContentWrapper<Content>> else { return nil }
                 guard let self = self else { return nil }
-                cell.setView(self.parent.configBlock(item), parentController: self.tableController)
+                let view = self.parent.configBlock(item)
+                
+                let wrapped = CellContentWrapper {
+                    view
+                } onTrailingActions: { [weak self] (trailing) in
+                    self?.trailingActions[indexPath] = trailing
+                } onLeadingActions: { (leading) in
+                    
+                } contextMenu: { [weak self] (menu) in
+                    self?.menuActions[indexPath] = menu
+                }
+
+                
+                cell.setView(wrapped, parentController: self.tableController)
                 return cell
             }
             dataSource?.defaultRowAnimation = .fade
@@ -327,6 +406,9 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         // Swipe actions support
         public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+            if let t = trailingActions[indexPath] {
+                return t
+            }
             guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
             return parent.trailingActions?(item)
         }
@@ -340,17 +422,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
 
         public func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
             
-            return nil
-//                UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { (element) -> UIMenu? in
-//                return UIMenu(title: "", children: [
-//                    UIAction(title: "Delete", attributes: .destructive, handler: { (action) in
-//                        
-//                    }),
-//                    UIAction(title: "Edit", handler: { (action) in
-//                        
-//                    })
-//                ])
-//            }
+            return menuActions[indexPath]
         }
     }
 }

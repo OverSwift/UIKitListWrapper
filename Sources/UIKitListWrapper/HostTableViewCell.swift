@@ -10,7 +10,7 @@ import SwiftUI
 
 class HostTableViewCell<T: View>: UITableViewCell {
     
-    private lazy var host: UIHostingController<HostCellView<T>> = {
+    private(set) lazy var host: UIHostingController<HostCellView<T>> = {
         let hostController = UIHostingController(rootView: HostCellView<T>())
         hostController.view.translatesAutoresizingMaskIntoConstraints = false
         hostController.view.backgroundColor = .clear        
@@ -31,6 +31,16 @@ class HostTableViewCell<T: View>: UITableViewCell {
     override func prepareForReuse() {
         host.view.invalidateIntrinsicContentSize()
         host.view.setNeedsLayout()
+        host.willMove(toParent: nil)
+        host.view.removeFromSuperview()
+        host.removeFromParent()
+        host = {
+            let hostController = UIHostingController(rootView: HostCellView<T>())
+            hostController.view.translatesAutoresizingMaskIntoConstraints = false
+            hostController.view.backgroundColor = .clear
+            return hostController
+        }()
+        
         super.prepareForReuse()
     }
     
