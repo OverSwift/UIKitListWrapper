@@ -176,6 +176,8 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     public func updateUIViewController(_ pageViewController: TableController, context: Context) {
         context.coordinator.fresh = fresh
         context.coordinator.data = data.map { $0 }
+        pageViewController.tableView.contentInset = self.contentInsets
+        pageViewController.tableView.scrollIndicatorInsets = self.contentInsets        
         if let ref = onRefresh {
             context.coordinator.tableController.addPullToRefresh {
                 ref()
@@ -286,11 +288,10 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                 } onTrailingActions: { [weak self] (trailing) in
                     self?.trailingActions[indexPath] = trailing
                 } onLeadingActions: { (leading) in
-                    
+                    self.leadingActions[indexPath] = leading
                 } contextMenu: { [weak self] (menu) in
                     self?.menuActions[indexPath] = menu
                 }
-
                 
                 cell.setView(wrapped, parentController: self.tableController)
                 return cell
