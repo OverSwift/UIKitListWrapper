@@ -66,7 +66,7 @@ public struct AAAcition: Equatable {
 
 //UIContextMenuConfiguration
 
-struct ContextPrefferenceKey: PreferenceKey {
+struct ContextMenuPreferenceKey: PreferenceKey {
     
     static var defaultValue: UIContextMenuConfiguration? = nil
     
@@ -77,12 +77,21 @@ struct ContextPrefferenceKey: PreferenceKey {
 
 extension View {
     public func setUIListContextMenu(_ menu: UIContextMenuConfiguration) -> some View {
-        self.preference(key: ContextPrefferenceKey.self, value: menu)
+        self.preference(key: ContextMenuPreferenceKey.self, value: menu)
     }
 }
 
 
-public struct ActionsPrefferenceKey: PreferenceKey {
+struct TrailActionsPreferenceKey: PreferenceKey {
+    
+    public static var defaultValue: UISwipeActionsConfiguration? = nil
+    
+    public static func reduce(value: inout UISwipeActionsConfiguration?, nextValue: () -> UISwipeActionsConfiguration?) {
+        value = nextValue()
+    }
+}
+
+struct LeadingActionsPreferenceKey: PreferenceKey {
     
     public static var defaultValue: UISwipeActionsConfiguration? = nil
     
@@ -93,8 +102,12 @@ public struct ActionsPrefferenceKey: PreferenceKey {
 
 extension View {
     
-    public func setUIListTrailAction(_ action: UISwipeActionsConfiguration?) -> some View {
-        self.preference(key: ActionsPrefferenceKey.self, value: action)
+    public func uilistTrailingActions(_ action: UISwipeActionsConfiguration?) -> some View {
+        self.preference(key: TrailActionsPreferenceKey.self, value: action)
+    }
+    
+    public func uilistLeadingActionsAction(_ action: UISwipeActionsConfiguration?) -> some View {
+        self.preference(key: TrailActionsPreferenceKey.self, value: action)
     }
 }
 
@@ -108,14 +121,19 @@ struct CellContentWrapper<Content: View>: View {
     
     var body: some View {
         content()
-            .onPreferenceChange(ActionsPrefferenceKey.self, perform: { value in
+            .onPreferenceChange(TrailActionsPreferenceKey.self, perform: { value in
                 if let actions = value {
                     onTrailingActions(actions)
                 }
             })
-            .onPreferenceChange(ContextPrefferenceKey.self, perform: { value in
+            .onPreferenceChange(ContextMenuPreferenceKey.self, perform: { value in
                 if let menu = value {
                     self.contextMenu(menu)
+                }
+            })
+            .onPreferenceChange(LeadingActionsPreferenceKey.self, perform: { value in
+                if let actions = value {
+                    onLeadingActions(actions)
                 }
             })
     }
@@ -229,19 +247,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         new.onRefresh = block
         return new
     }
-    
-    public func setLeadingActions(_ block: ((Item) -> UISwipeActionsConfiguration?)?) -> Self {
-        var new = self
-        new.leadingActions = block
-        return new
-    }
-    
-    public func setTrailingActions(_ block: ((Item) -> UISwipeActionsConfiguration?)?) -> Self {
-        var new = self
-        new.trailingActions = block
-        return new
-    }
-        
+            
     public class Coordinator: NSObject, UITableViewDelegate, UITableViewDataSourcePrefetching {
         
         typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Item>
@@ -407,22 +413,16 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         // Swipe actions support
         public func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            if let t = trailingActions[indexPath] {
-                return t
-            }
-            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
-            return parent.trailingActions?(item)
+            trailingActions[indexPath]
         }
         
         public func tableView(_ tableView: UITableView, leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return nil }
-            return parent.leadingActions?(item)
+            return leadingActions[indexPath]
         }
         
         //Context Menu support
 
         public func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
-            
             return menuActions[indexPath]
         }
     }
