@@ -337,6 +337,9 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                     guard let self = self else { return }
                     self.tableController.tableView.refreshControl?.endRefreshing()
                     guard self.tableController.tableView.numberOfSections > 0 else { return }
+                    DispatchQueue.main.async {
+                        self.lastUpdatedIds = snapshot.itemIdentifiers
+                    }
                     if self.fresh {
                         self.tableController.tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
                     }
@@ -353,9 +356,6 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         }
         
         public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
-//            guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<Content> else { return }
-//            guard let item = dataSource?.itemIdentifier(for: indexPath) else { return }
-//            print("Will display item \(item)")
         }
         
         public func tableView(_ tableView: UITableView, didEndDisplaying cell: UITableViewCell, forRowAt indexPath: IndexPath) {
@@ -366,7 +366,6 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
             indexPaths.forEach { indexPath in
                 if indexPath.section == data.count - 1 {
                     if indexPath.row == data[indexPath.section].items.count - 1 {
-//                        print("=== DISPLAY LAST ITEM IN TABLE REQUEST MORE !!! ===")
                     }
                 }
             }
