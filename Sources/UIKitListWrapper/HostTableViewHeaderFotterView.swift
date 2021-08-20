@@ -31,6 +31,10 @@ class HostTableViewHeaderFotterView<T: View>: UITableViewHeaderFooterView {
         fatalError("init(coder:) has not been implemented")
     }
     
+    deinit {
+        
+    }
+    
     func setView(_ view: T, parentController: UIViewController) {
         
         host.rootView = HostCellView {

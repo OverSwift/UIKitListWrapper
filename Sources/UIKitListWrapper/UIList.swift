@@ -176,7 +176,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     private var trailingActions: ((Item) -> UISwipeActionsConfiguration?)?
     private var leadingActions: ((Item) -> UISwipeActionsConfiguration?)?
 
-    private var vc: TableController = {
+    private var tableController: TableController = {
         let controller = TableController()
         controller.tableView.register(HostTableViewCell<CellContentWrapper<Content>>.self, forCellReuseIdentifier: "Cell")
         controller.tableView.register(HostTableViewHeaderFotterView<Header>.self, forHeaderFooterViewReuseIdentifier: "Header")
@@ -187,8 +187,8 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     } ()
     
     public func makeUIViewController(context: Context) -> TableController {
-        vc.tableView.contentInset = self.contentInsets
-        return vc
+        tableController.tableView.contentInset = self.contentInsets
+        return tableController
     }
     
     public func updateUIViewController(_ pageViewController: TableController, context: Context) {
@@ -197,16 +197,20 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         pageViewController.tableView.contentInset = self.contentInsets
         pageViewController.tableView.scrollIndicatorInsets = self.contentInsets        
         if let ref = onRefresh {
-            context.coordinator.tableController.addPullToRefresh {
+            context.coordinator.tableController?.addPullToRefresh {
                 ref()
             }
         }
     }
     
+    public static func dismantleUIViewController(_ uiViewController: TableController, coordinator: Coordinator) {
+        coordinator.clear()
+    }
+    
     public func makeCoordinator() -> Coordinator {
-        let coordinator = Coordinator(self)
-        vc.tableView.delegate = coordinator
-        vc.tableView.prefetchDataSource = coordinator
+        let coordinator = Coordinator(tableController: tableController, configBlock: configBlock, header: header, fotter: fotter)
+        tableController.tableView.delegate = coordinator
+        tableController.tableView.prefetchDataSource = coordinator
         return coordinator
     }
     
@@ -252,13 +256,10 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         typealias Snapshot = NSDiffableDataSourceSnapshot<Section, Item>
         
-        var tableController: TableController {
-            parent.vc
-        }
+        weak var tableController: TableController?
         
         private var dataSource: UITableViewDiffableDataSource<Section, Item>?
         private var dataUpdateQueue: DispatchQueue = DispatchQueue(label: "com.list.data.update.queue")
-        var parent: UIList
         var fresh: Bool = true
         
         var data: [Section] = [] {
@@ -266,15 +267,29 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                 update(with: data)
             }
         }
-        
-        
-        init(_ parent: UIList) {
-            self.parent = parent
+        private var lastUpdatedIds:[Item] = []
+        var configBlock: ConfigBlock
+        var header: HeaderBlock?
+        var fotter: FotterBlock?
+
+        init(tableController: TableController, configBlock: @escaping ConfigBlock, header: HeaderBlock?, fotter: FotterBlock?) {
+            self.tableController = tableController
+            self.configBlock = configBlock
+            self.header = header
+            self.fotter = fotter
             super.init()
             createDataSource()
         }
         
+        func clear() {
+            dataSource = nil
+            lastUpdatedIds.removeAll()
+            data.removeAll()
+            tableController = nil
+        }
+        
         deinit {
+            lastUpdatedIds.removeAll()
             data.removeAll()
         }
         
@@ -283,11 +298,11 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         private var menuActions: [IndexPath : UIContextMenuConfiguration] = [:]
 
         private func createDataSource() {
-            let table = tableController.tableView
+            guard let table = tableController?.tableView else { return }
             self.dataSource = InternalDataSource<Section, Item>(tableView: table) { [weak self] (tableView, indexPath, item) -> UITableViewCell? in
                 guard let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath) as? HostTableViewCell<CellContentWrapper<Content>> else { return nil }
                 guard let self = self else { return nil }
-                let view = self.parent.configBlock(item)
+                let view = self.configBlock(item)
                 
                 let wrapped = CellContentWrapper {
                     view
@@ -298,14 +313,15 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                 } contextMenu: { [weak self] (menu) in
                     self?.menuActions[indexPath] = menu
                 }
-                
-                cell.setView(wrapped, parentController: self.tableController)
+                if let tableController = self.tableController {
+                    cell.setView(wrapped, parentController: tableController)
+                }
                 return cell
             }
             dataSource?.defaultRowAnimation = .fade
         }
         
-        private var lastUpdatedIds:[Item] = []
+        
         
         fileprivate func update(with data: [Section]) {
             dataUpdateQueue.async { [weak self] in
@@ -333,15 +349,15 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                         return
                     }
                 }
-                self.dataSource?.apply(snapshot, animatingDifferences: self.parent.animateChanges) { [weak self] in
+                self.dataSource?.apply(snapshot, animatingDifferences: true) { [weak self] in
                     guard let self = self else { return }
-                    self.tableController.tableView.refreshControl?.endRefreshing()
-                    guard self.tableController.tableView.numberOfSections > 0 else { return }
+                    self.tableController?.tableView.refreshControl?.endRefreshing()
+                    guard self.tableController?.tableView.numberOfSections ?? 0 > 0 else { return }
                     DispatchQueue.main.async {
                         self.lastUpdatedIds = snapshot.itemIdentifiers
                     }
                     if self.fresh {
-                        self.tableController.tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
+                        self.tableController?.tableView.scrollToRow(at: IndexPath(row: 0, section: 0), at: .top, animated: true)
                     }
                 }
             }
@@ -349,9 +365,9 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         private func refreshTableSizes() {
             DispatchQueue.main.async {
-                self.tableController.tableView.beginUpdates()
-                self.tableController.tableView.endUpdates()
-                self.tableController.tableView.refreshControl?.endRefreshing()
+                self.tableController?.tableView.beginUpdates()
+                self.tableController?.tableView.endUpdates()
+                self.tableController?.tableView.refreshControl?.endRefreshing()
             }
         }
         
@@ -372,41 +388,45 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         }
         
         public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-            guard (self.parent.header != nil) else {
+            guard (self.header != nil) else {
                 return 0
             }
             return UITableView.automaticDimension
         }
 
         public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-            guard let block = self.parent.header else {
+            guard let block = self.header else {
                 return nil
             }
             
             guard let view = tableView.dequeueReusableHeaderFooterView(withIdentifier: "Header") as? HostTableViewHeaderFotterView<Header> else { return nil }
             let item = data[section]
             
-            view.setView(block(item, section), parentController: self.tableController)
+            if let tableController = self.tableController {
+                view.setView(block(item, section), parentController: tableController)
+            }
+            
             view.setNeedsLayout()
             return view
         }
         
         public func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-            guard (self.parent.fotter != nil) else {
+            guard (self.fotter != nil) else {
                 return 0
             }
             return UITableView.automaticDimension
         }
         
         public func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
-            guard let block = self.parent.fotter else {
+            guard let block = self.fotter else {
                 return nil
             }
             
             guard let view = tableView.dequeueReusableHeaderFooterView(withIdentifier: "Fotter") as? HostTableViewHeaderFotterView<Fotter> else { return nil }
             let item = data[section]
-            
-            view.setView(block(item, section), parentController: self.tableController)
+            if let tableController = self.tableController {
+                view.setView(block(item, section), parentController: tableController)
+            }
             return view
         }
         

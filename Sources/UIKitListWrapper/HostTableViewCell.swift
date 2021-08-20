@@ -28,6 +28,12 @@ class HostTableViewCell<T: View>: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    deinit {
+        host.willMove(toParent: nil)
+        host.view.removeFromSuperview()
+        host.removeFromParent()
+    }
+    
     override func prepareForReuse() {
         host.view.invalidateIntrinsicContentSize()
         host.view.setNeedsLayout()
