@@ -188,14 +188,22 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     
     public func makeUIViewController(context: Context) -> TableController {
         tableController.tableView.contentInset = self.contentInsets
+        context.coordinator.configBlock = configBlock
+        context.coordinator.header = header
+        context.coordinator.fotter = fotter
+        context.coordinator.animateChanges = self.animateChanges
         return tableController
     }
     
-    public func updateUIViewController(_ pageViewController: TableController, context: Context) {
+    public func updateUIViewController(_ tableViewController: TableController, context: Context) {
         context.coordinator.fresh = fresh
+        context.coordinator.configBlock = configBlock
+        context.coordinator.header = header
+        context.coordinator.fotter = fotter
+        context.coordinator.animateChanges = self.animateChanges
         context.coordinator.data = data.map { $0 }
-        pageViewController.tableView.contentInset = self.contentInsets
-        pageViewController.tableView.scrollIndicatorInsets = self.contentInsets        
+        tableViewController.tableView.contentInset = self.contentInsets
+        tableViewController.tableView.scrollIndicatorInsets = self.contentInsets        
         if let ref = onRefresh {
             context.coordinator.tableController?.addPullToRefresh {
                 ref()
@@ -208,7 +216,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
     }
     
     public func makeCoordinator() -> Coordinator {
-        let coordinator = Coordinator(tableController: tableController, configBlock: configBlock, header: header, fotter: fotter)
+        let coordinator = Coordinator(tableController: tableController, configBlock: configBlock, header: header, fotter: fotter, animateChanges: self.animateChanges)
         tableController.tableView.delegate = coordinator
         tableController.tableView.prefetchDataSource = coordinator
         return coordinator
@@ -260,7 +268,9 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         
         private var dataSource: UITableViewDiffableDataSource<Section, Item>?
         private var dataUpdateQueue: DispatchQueue = DispatchQueue(label: "com.list.data.update.queue")
+        
         var fresh: Bool = true
+        var animateChanges: Bool
         
         var data: [Section] = [] {
             didSet {
@@ -272,11 +282,16 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
         var header: HeaderBlock?
         var fotter: FotterBlock?
 
-        init(tableController: TableController, configBlock: @escaping ConfigBlock, header: HeaderBlock?, fotter: FotterBlock?) {
+        init(tableController: TableController,
+             configBlock: @escaping ConfigBlock,
+             header: HeaderBlock?,
+             fotter: FotterBlock?,
+             animateChanges: Bool) {
             self.tableController = tableController
             self.configBlock = configBlock
             self.header = header
             self.fotter = fotter
+            self.animateChanges = animateChanges
             super.init()
             createDataSource()
         }
