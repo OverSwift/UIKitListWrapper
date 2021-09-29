@@ -364,7 +364,7 @@ public struct UIList<Section, Item, Content, Header, Fotter>: UIViewControllerRe
                         return
                     }
                 }
-                self.dataSource?.apply(snapshot, animatingDifferences: true) { [weak self] in
+                self.dataSource?.apply(snapshot, animatingDifferences: self.animateChanges) { [weak self] in
                     guard let self = self else { return }
                     self.tableController?.tableView.refreshControl?.endRefreshing()
                     guard self.tableController?.tableView.numberOfSections ?? 0 > 0 else { return }
